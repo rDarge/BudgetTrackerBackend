@@ -2,9 +2,7 @@
 
 # TODO move to test file
 from datetime import date, datetime
-import hashlib
-from io import TextIOWrapper
-from typing import Dict, List
+from typing import BinaryIO, Dict, List
 from sqlalchemy import Enum
 from sqlalchemy.orm import Session
 
@@ -55,6 +53,7 @@ def add_transactions(
 
 def parse_header_line(line: str) -> HeaderMapping:
     headers = {}
+    print(line)
     keys = line.lower().split(",")
     for idx, key in enumerate(keys):
         header_key = header_aliases.get(key)
@@ -91,14 +90,15 @@ def parse_transaction(headers: HeaderMapping, transaction_line: str):
     return new_record
 
 
-def parse_csv(file: TextIOWrapper) -> List[Transaction]:
+def parse_csv(file: BinaryIO) -> List[Transaction]:
     headers: HeaderMapping | None = None
     transactions: List[Transaction] = []
     for line_number, line in enumerate(file):
+        parsed_line = line.decode("utf-8")
         if line_number == 0:
-            headers = parse_header_line(line)
-        elif len(line.strip()) < 1:
+            headers = parse_header_line(parsed_line)
+        elif len(parsed_line.strip()) < 1:
             print("Unexpected empty line in CSV at line {line_number}")
         else:
-            transactions.append(parse_transaction(headers, line))
+            transactions.append(parse_transaction(headers, parsed_line))
     return transactions
