@@ -7,8 +7,13 @@ from sqlalchemy.orm import Session
 import uvicorn
 
 from backend.csv import parse_csv
-from backend.messages import AccountData, PostAccountRequest
-from database.models import Account, TransactionFile
+from backend.messages import (
+    AccountData,
+    GetTransactionsResponse,
+    PostAccountRequest,
+    TransactionData,
+)
+from database.models import Account, Transaction, TransactionFile
 
 app = FastAPI()
 
@@ -95,6 +100,34 @@ async def import_csv(account_id: int, uploadFile: UploadFile, session: SessionDe
 
         # TODO: Return a summary of the operations performed (# added, # skipped)
         return {"description": transactions[0].description, "total": len(transactions)}
+
+
+@app.get("/account/{account_id}/transactions", response_model=GetTransactionsResponse)
+async def get_transactions(
+    session: SessionDep,
+    account_id: int,
+    page: int = 0,
+    per_page: int = 20,
+):
+
+    # Persist file for reference.
+    with session.begin():
+        transactions = (
+            session.query(Transaction)
+            .filter(Transaction.account_id == account_id)
+            .order_by(Transaction.post_date.desc())
+            .offset(page * per_page)
+            .limit(per_page)
+            .all()
+        )
+
+    transactionData = [
+        TransactionData.model_validate(transaction, from_attributes=True)
+        for transaction in transactions
+    ]
+    return GetTransactionsResponse(
+        transactions=transactionData, page=page, per_page=per_page
+    )
 
 
 def start():
