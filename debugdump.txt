@@ -1,0 +1,29 @@
+== Info:   Trying 127.0.0.1:8000...
+== Info: Connected to localhost (127.0.0.1) port 8000 (#0)
+=> Send header, 144 bytes (0x90)
+0000: POST /import HTTP/1.1
+0017: Host: localhost:8000
+002d: User-Agent: curl/7.81.0
+0046: Accept: */*
+0053: Content-Type:application/octet-stream
+007a: Content-Length: 52
+008e: 
+=> Send data, 52 bytes (0x34)
+0000: test_data/sensitive/sample_transactions_checking.CSV
+== Info: Mark bundle as not supporting multiuse
+<= Recv header, 35 bytes (0x23)
+0000: HTTP/1.1 422 Unprocessable Entity
+<= Recv header, 37 bytes (0x25)
+0000: date: Sat, 03 Aug 2024 21:06:46 GMT
+<= Recv header, 17 bytes (0x11)
+0000: server: uvicorn
+<= Recv header, 20 bytes (0x14)
+0000: content-length: 95
+<= Recv header, 32 bytes (0x20)
+0000: content-type: application/json
+<= Recv header, 2 bytes (0x2)
+0000: 
+<= Recv data, 95 bytes (0x5f)
+0000: {"detail":[{"type":"missing","loc":["body","uploadFile"],"msg":"
+0040: Field required","input":null}]}
+== Info: Connection #0 to host localhost left intact

@@ -1,4 +1,3 @@
-from io import TextIOWrapper
 import os
 from typing import Annotated, List
 from fastapi import Depends, FastAPI, UploadFile
@@ -8,7 +7,7 @@ from sqlalchemy.orm import Session
 import uvicorn
 
 from backend.csv import parse_csv
-from backend.messages import AccountData, GetAccountsResponse, PostAccountRequest
+from backend.messages import AccountData, PostAccountRequest
 from database.models import Account, TransactionFile
 
 app = FastAPI()
