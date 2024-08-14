@@ -1,11 +1,30 @@
 from datetime import datetime
-from typing import List, Optional
-from sqlalchemy import ForeignKey, String, DateTime, Float, UniqueConstraint
+from typing import List
+from sqlalchemy import (
+    ForeignKey,
+    LargeBinary,
+    String,
+    DateTime,
+    Float,
+    UniqueConstraint,
+)
+from sqlalchemy.sql import func
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class TransactionFile(Base):
+    __tablename__ = "transaction_file"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    filename: Mapped[str] = mapped_column(String(200))
+    data: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    transactions: Mapped[List["Transaction"]] = relationship("Transaction")
 
 
 class Account(Base):
@@ -26,11 +45,20 @@ class Transaction(Base):
     description: Mapped[str] = mapped_column(String(200))
     amount: Mapped[float] = mapped_column(Float)
 
-    account_id: Mapped[int] = mapped_column(ForeignKey("account.id"))
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("account.id", name="transaction_account_id")
+    )
     account: Mapped[Account] = relationship(back_populates="transactions")
 
-    category_id: Mapped[int | None] = mapped_column(ForeignKey("category.id"))
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("category.id", name="transaction_category_id")
+    )
     category: Mapped["Category"] = relationship(back_populates="transactions")
+
+    source_file_id: Mapped[int | None] = mapped_column(
+        ForeignKey("transaction_file.id", name="transaction_file_id")
+    )
+    source_file: Mapped[TransactionFile] = relationship(back_populates="transactions")
 
     __table_args__ = (
         UniqueConstraint("post_date", "description", "amount", name="_transaction_uc"),

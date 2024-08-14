@@ -32,7 +32,8 @@ alembic upgrade head
 TODO: 
 * [DONE] *basic database setup*
 * [DONE] *basic csv parsing*
-* [NEXT] **FastAPI router for basic operations**
-* OpenAPI json generator
-* React App for frontend
+* [DONE] **FastAPI router for basic operations**
+* [DONE] OpenAPI json generator
+* [DONE] React App for frontend
 * Consider reimplementing in Electron?
+* Consider using sqlite database rather than heavy PG database?

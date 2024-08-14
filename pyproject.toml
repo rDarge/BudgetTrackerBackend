@@ -11,6 +11,9 @@ packages = [
     { include = "database" }
 ]
 
+[tool.poetry.scripts]
+dev = "backend.app:start"
+
 [tool.poetry.dependencies]
 python = "^3.10"
 pydantic = "^2.8.2"
