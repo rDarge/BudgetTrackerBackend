@@ -1,6 +1,6 @@
 import os
 from typing import Annotated, List
-from fastapi import Depends, FastAPI, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -9,11 +9,23 @@ import uvicorn
 from backend.csv import parse_csv
 from backend.messages import (
     AccountData,
+    CategoryData,
+    GetCategoriesResponse,
     GetTransactionsResponse,
     PostAccountRequest,
+    PostCategoryRequest,
+    SupercategoryData,
     TransactionData,
+    UpdateTransactionRequest,
+    UpdateTransactionResponse,
 )
-from database.models import Account, Transaction, TransactionFile
+from database.models import (
+    Account,
+    Category,
+    Supercategory,
+    Transaction,
+    TransactionFile,
+)
 
 app = FastAPI()
 
@@ -128,6 +140,105 @@ async def get_transactions(
     return GetTransactionsResponse(
         transactions=transactionData, page=page, per_page=per_page
     )
+
+
+@app.put("/transactions", response_model=UpdateTransactionResponse)
+async def update_transaction(session: SessionDep, request: UpdateTransactionRequest):
+    # Persist file for reference.
+    with session.begin():
+        transaction = (
+            session.query(Transaction)
+            .filter(Transaction.id == request.transaction.id)
+            .first()
+        )
+        if transaction is None:
+            raise HTTPException(
+                status_code=404, detail="Cannot find transaction to update"
+            )
+
+        if (
+            transaction.account_id != request.transaction.account_id
+            or transaction.amount != request.transaction.amount
+            or transaction.description != request.transaction.description
+            or transaction.post_date != request.transaction.post_date
+            or transaction.init_date != request.transaction.init_date
+        ):
+            raise HTTPException(
+                status_code=501,
+                detail="Cannot change transaction fields outside of category",
+            )
+
+        if request.newCategoryName:
+            if request.newSuperName:
+                # Create new category AND new super
+                new_super = Supercategory(name=request.newSuperName)
+                category = Category(
+                    name=request.newCategoryName, supercategory=new_super
+                )
+            elif request.superId:
+                # Create new category with existing superId
+                category = Category(
+                    name=request.newCategoryName, supercategory_id=request.superId
+                )
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="must supply superId or newSuperName when providing newCategoryName",
+                )
+            transaction.category = category
+        else:
+            transaction.category_id = request.transaction.category_id
+        session.flush()
+        result = TransactionData.model_validate(transaction, from_attributes=True)
+
+    return result
+
+
+@app.get("/categories", response_model=GetCategoriesResponse)
+async def getCategories(
+    session: SessionDep,
+):
+
+    # Persist file for reference.
+    with session.begin():
+        categories = session.query(Category).order_by(Category.name.asc()).all()
+
+        categoryData = [
+            CategoryData.model_validate(category, from_attributes=True)
+            for category in categories
+        ]
+
+        supercategories = (
+            session.query(Supercategory).order_by(Supercategory.name.asc()).all()
+        )
+
+        superCategoryData = [
+            SupercategoryData.model_validate(supercategory, from_attributes=True)
+            for supercategory in supercategories
+        ]
+
+    return GetCategoriesResponse(
+        categories=categoryData, superCategories=superCategoryData
+    )
+
+
+@app.post("/category", response_model=CategoryData)
+async def post_category(session: SessionDep, request: PostCategoryRequest):
+
+    new_category = Category(
+        name=request.name, supercategory_id=request.supercategory_id
+    )
+
+    with session.begin():
+        if request.supercategory_name:
+            # If they submit a new supercategory name, create that too
+            new_supercategory = Supercategory(name=request.supercategory_name)
+            new_category.supercategory = new_supercategory
+
+        session.add(new_category)
+        session.commit()
+
+    return AccountData.model_validate(new_category, from_attributes=True)
 
 
 def start():
