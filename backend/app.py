@@ -22,6 +22,7 @@ from backend.messages import (
 from database.models import (
     Account,
     Category,
+    Rule,
     Supercategory,
     Transaction,
     TransactionFile,
@@ -239,6 +240,30 @@ async def post_category(session: SessionDep, request: PostCategoryRequest):
         session.commit()
 
     return AccountData.model_validate(new_category, from_attributes=True)
+
+
+@app.put("/category", response_model=CategoryData)
+async def update_category(session: SessionDep, request: CategoryData):
+    with session.begin():
+        category = session.get_one(Category, request.id)
+        category.name = request.name
+
+        if category.supercategory_id != request.supercategory_id:
+            category.supercategory_id = request.supercategory_id
+
+        category.rules.clear()
+
+        for rule in request.rules:
+            category.rules.append(
+                Rule(contains=rule.contains, case_sensitive=rule.case_sensitive)
+            )
+
+        session.flush()
+        session.refresh(category)
+        result = CategoryData.model_validate(category, from_attributes=True)
+        session.commit()
+
+    return result
 
 
 def start():

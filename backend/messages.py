@@ -48,9 +48,15 @@ class GetTransactionsResponse(BaseModel):
     per_page: int
 
 
+class RuleData(BaseModel):
+    contains: str
+    case_sensitive: bool
+
+
 class CategoryData(ModelWithID):
     name: str
     supercategory_id: int
+    rules: List[RuleData]
 
 
 class SupercategoryData(ModelWithID):
@@ -66,3 +72,10 @@ class PostCategoryRequest(BaseModel):
     name: str
     supercategory_id: int | None
     supercategory_name: int | None
+
+
+class UpdateCategoryRequest(BaseModel):
+    id: int
+    name: str
+    supercategory_id: int
+    rules: List[RuleData]

@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List
 from sqlalchemy import (
+    Boolean,
     ForeignKey,
     LargeBinary,
     String,
@@ -73,6 +74,8 @@ class Category(Base):
 
     transactions: Mapped[List[Transaction]] = relationship(back_populates="category")
 
+    rules: Mapped[List["Rule"]] = relationship(back_populates="category")
+
     supercategory_id: Mapped[int] = mapped_column(ForeignKey("supercategory.id"))
     supercategory: Mapped["Supercategory"] = relationship(back_populates="categories")
 
@@ -84,3 +87,17 @@ class Supercategory(Base):
     name: Mapped[str] = mapped_column(String(100))
 
     categories: Mapped[List[Category]] = relationship()
+
+
+class Rule(Base):
+    __tablename__ = "rule"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    contains: Mapped[str] = mapped_column(String(100))
+    case_sensitive: Mapped[bool] = mapped_column(Boolean)
+
+    category_id: Mapped[int | None] = mapped_column(
+        ForeignKey("category.id", name="rule_category_id")
+    )
+    category: Mapped["Category"] = relationship(back_populates="rules")
