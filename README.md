@@ -37,7 +37,17 @@ TODO:
 * [DONE] *React App for frontend*
 * [DONE] Transaction categories
 * [DONE] Transaction rules
-* Apply rules automatically and when importing transactions
+* [DONE] Apply rules manually
+* Transaction pagination in FE
+* Add hierarchy/ordering for categories when chosing transaction category
+* Migrate rules to be account-specific (should categories be specific too? unsure)
+* Apply rules when importing transactions
 * Mark transactions that have been validated manually and exclude them from recategorization when changing rules
-* Consider reimplementing in Electron?
-* Consider using sqlite database rather than heavy PG database?
+* Reporting by category and date (month, quarter, yty, etc)
+* Define budgets (an account is tied to one budget, allows users to define amount per category for target spending/saving) (is it important to track historic budgets? I don't think so??)
+* Forecasting (based on average run rates, comparing with budgets, allowing us to see differences based on changes to budgets)
+* View optimized for categorizing uncategorized transactions
+* ...
+* Basic audit log?
+* User accounts & authentication? Can we enforce only in-home access with simple password and router forwarding?
+* Consider reimplementing in Electron w sqlite database to minimize footprint/make portable?
