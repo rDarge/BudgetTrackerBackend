@@ -5,6 +5,7 @@ import codecs
 import csv
 from datetime import date, datetime
 from typing import BinaryIO, Dict, List
+
 from sqlalchemy import Enum
 from sqlalchemy.orm import Session
 
