@@ -1,16 +1,10 @@
 from datetime import datetime
 from typing import List
-from sqlalchemy import (
-    Boolean,
-    ForeignKey,
-    LargeBinary,
-    String,
-    DateTime,
-    Float,
-    UniqueConstraint,
-)
+
+from sqlalchemy import (Boolean, DateTime, Float, ForeignKey, LargeBinary,
+                        String, UniqueConstraint)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
 
 
 class Base(DeclarativeBase):
@@ -45,6 +39,7 @@ class Transaction(Base):
     post_date: Mapped[datetime] = mapped_column(DateTime)
     description: Mapped[str] = mapped_column(String(200))
     amount: Mapped[float] = mapped_column(Float)
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     account_id: Mapped[int] = mapped_column(
         ForeignKey("account.id", name="transaction_account_id")

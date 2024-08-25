@@ -1,14 +1,17 @@
 import os
 from typing import Annotated, List
+
+import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, or_
 from sqlalchemy.orm import Session
-import uvicorn
 
 from backend.csv import parse_csv
 from backend.messages import (
     AccountData,
+    ApplyRulesRequest,
+    ApplyRulesResponse,
     CategoryData,
     GetCategoriesResponse,
     GetTransactionsResponse,
@@ -16,6 +19,7 @@ from backend.messages import (
     PostCategoryRequest,
     SupercategoryData,
     TransactionData,
+    TransactionUpdates,
     UpdateTransactionRequest,
     UpdateTransactionResponse,
 )
@@ -166,7 +170,7 @@ async def update_transaction(session: SessionDep, request: UpdateTransactionRequ
         ):
             raise HTTPException(
                 status_code=501,
-                detail="Cannot change transaction fields outside of category",
+                detail="Cannot change transaction fields outside of category and verified",
             )
 
         if request.newCategoryName:
@@ -187,8 +191,12 @@ async def update_transaction(session: SessionDep, request: UpdateTransactionRequ
                     detail="must supply superId or newSuperName when providing newCategoryName",
                 )
             transaction.category = category
-        else:
+        elif request.transaction.category_id != transaction.category_id:
             transaction.category_id = request.transaction.category_id
+
+        if request.transaction.verified_at:
+            transaction.verified_at = request.transaction.verified_at
+
         session.flush()
         result = TransactionData.model_validate(transaction, from_attributes=True)
 
@@ -264,6 +272,52 @@ async def update_category(session: SessionDep, request: CategoryData):
         session.commit()
 
     return result
+
+
+@app.post("/account/{account_id}/apply-rules", response_model=ApplyRulesResponse)
+async def apply_rules(account_id: int, request: ApplyRulesRequest, session: SessionDep):
+    updated_transactions: List[TransactionUpdates] = []
+    with session.begin():
+        rules = session.query(Rule).order_by(Rule.id.asc()).all()
+
+        # For each rule, for each transaction, update the category if the contains clause matches
+        for rule in rules:
+            if rule.category_id is None:
+                print(f"Invalid rule {rule.id} with contains ${rule.contains}")
+                continue
+            filter_clause = []
+            filter_clause.append(Transaction.account_id == account_id)
+            filter_clause.append(
+                or_(
+                    Transaction.category_id != rule.category_id,
+                    Transaction.category_id == None,
+                )
+            )
+            filter_clause.append(
+                Transaction.description.like(f"%{rule.contains}%")
+                if rule.case_sensitive
+                else Transaction.description.ilike(f"%{rule.contains}%")
+            )
+            records_to_update = session.query(Transaction).filter(*filter_clause).all()
+            for record in records_to_update:
+                updated_transactions.append(
+                    TransactionUpdates(
+                        transaction=TransactionData.model_validate(
+                            record, from_attributes=True
+                        ),
+                        old_category=(
+                            record.category.name if record.category else "None"
+                        ),
+                        new_category=rule.category.name,
+                    )
+                )
+
+                record.category_id = rule.category_id
+        if request.preview:
+            session.rollback()
+        else:
+            session.commit()
+    return ApplyRulesResponse(updated_transactions=updated_transactions)
 
 
 def start():

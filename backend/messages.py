@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List
+
 from pydantic import BaseModel
 
 
@@ -17,6 +18,7 @@ class AccountData(ModelWithID):
 class TransactionData(ModelWithID):
     init_date: datetime | None = None
     post_date: datetime
+    verified_at: datetime | None = None
     description: str
     amount: float
     account_id: int
@@ -79,3 +81,17 @@ class UpdateCategoryRequest(BaseModel):
     name: str
     supercategory_id: int
     rules: List[RuleData]
+
+
+class ApplyRulesRequest(BaseModel):
+    preview: bool
+
+
+class TransactionUpdates(BaseModel):
+    transaction: TransactionData
+    old_category: str
+    new_category: str
+
+
+class ApplyRulesResponse(BaseModel):
+    updated_transactions: List[TransactionUpdates]

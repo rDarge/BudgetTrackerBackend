@@ -32,8 +32,12 @@ alembic upgrade head
 TODO: 
 * [DONE] *basic database setup*
 * [DONE] *basic csv parsing*
-* [DONE] **FastAPI router for basic operations**
-* [DONE] OpenAPI json generator
-* [DONE] React App for frontend
+* [DONE] *FastAPI router for basic operations*
+* [DONE] *OpenAPI json generator*
+* [DONE] *React App for frontend*
+* [DONE] Transaction categories
+* [DONE] Transaction rules
+* Apply rules automatically and when importing transactions
+* Mark transactions that have been validated manually and exclude them from recategorization when changing rules
 * Consider reimplementing in Electron?
 * Consider using sqlite database rather than heavy PG database?
