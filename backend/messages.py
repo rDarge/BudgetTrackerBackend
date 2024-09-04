@@ -13,6 +13,7 @@ class ModelWithID(BaseModel):
 
 class AccountData(ModelWithID):
     name: str
+    group: str
 
 
 class TransactionData(ModelWithID):
@@ -27,6 +28,7 @@ class TransactionData(ModelWithID):
 
 class PostAccountRequest(BaseModel):
     name: str
+    group: str
 
 
 class GetAccountsResponse(BaseModel):
@@ -53,6 +55,7 @@ class GetTransactionsResponse(BaseModel):
 class RuleData(BaseModel):
     contains: str
     case_sensitive: bool
+    account_id: int
 
 
 class CategoryData(ModelWithID):

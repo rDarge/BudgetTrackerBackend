@@ -70,10 +70,10 @@ def parse_header_line(keys: List[str]) -> HeaderMapping:
     return headers
 
 
-def _parse_date(date_string: str) -> date:
+def _parse_date(date_string: str) -> datetime:
     format = "%m/%d/%Y"
     parsed_datetime = datetime.strptime(date_string, format)
-    return parsed_datetime.date()
+    return parsed_datetime
 
 
 def parse_transaction(headers: HeaderMapping, line: List[str]):
@@ -95,11 +95,16 @@ def parse_csv(file: BinaryIO) -> List[Transaction]:
     transactions: List[Transaction] = []
     textFile = codecs.getreader("utf-8")(file)
     csv_reader = csv.reader(textFile, delimiter=",", quotechar='"')
+    unique_transaction_set = set()
     for line_number, line in enumerate(csv_reader):
         if line_number == 0:
             headers = parse_header_line(line)
         elif len(line) < 1:
             print(f"Unexpected empty line in CSV at line {line_number}")
         else:
-            transactions.append(parse_transaction(headers, line))
+            transaction = parse_transaction(headers, line)
+            while transaction.unique_string in unique_transaction_set:
+                transaction.description += "*"
+            unique_transaction_set.add(transaction.unique_string)
+            transactions.append(transaction)
     return transactions

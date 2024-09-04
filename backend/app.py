@@ -1,10 +1,11 @@
+from contextlib import contextmanager
 import os
 from typing import Annotated, List
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, func, or_
+from sqlalchemy import Engine, create_engine, func, or_
 from sqlalchemy.orm import Session
 
 from backend.csv import parse_csv
@@ -54,15 +55,21 @@ default_engine = None
 
 
 def get_default_engine():
+    global default_engine
     if default_engine:
         return default_engine
     conn_string = os.environ.get("SQLALCHEMY_CONNECTION_STRING")
-    engine = create_engine(conn_string, future=True)
-    return Session(engine)
+    default_engine = create_engine(conn_string, future=True)
+    return default_engine
 
 
 async def session():
-    return get_default_engine()
+    session = Session(get_default_engine())
+    try:
+        yield session
+    finally:
+        print("closing session")
+        session.close()
 
 
 SessionDep = Annotated[Session, Depends(session)]
@@ -72,7 +79,7 @@ SessionDep = Annotated[Session, Depends(session)]
 async def post_account(session: SessionDep, request: PostAccountRequest):
     """Testing: curl -H "Content-Type: application/json" -d "{\"name\":\"test\"}" http://localhost:8000/account"""
     with session.begin():
-        new_account = Account(name=request.name)
+        new_account = Account(name=request.name, group=request.group)
         session.add(new_account)
         session.commit()
 
@@ -132,7 +139,7 @@ async def get_transactions(
         transactions = (
             session.query(Transaction)
             .filter(Transaction.account_id == account_id)
-            .order_by(Transaction.post_date.desc())
+            .order_by(Transaction.post_date.desc(), Transaction.description.asc())
             .offset(page * per_page)
             .limit(per_page)
             .all()
@@ -259,12 +266,19 @@ async def update_category(session: SessionDep, request: CategoryData):
         if category.supercategory_id != request.supercategory_id:
             category.supercategory_id = request.supercategory_id
 
-        category.rules.clear()
+        for rule in category.rules:
+            session.delete(rule)
 
         for rule in request.rules:
-            category.rules.append(
-                Rule(contains=rule.contains, case_sensitive=rule.case_sensitive)
+            print(rule)
+            new_rule = Rule(
+                contains=rule.contains,
+                case_sensitive=rule.case_sensitive,
+                account_id=rule.account_id,
+                category=category,
             )
+            print(new_rule)
+            session.add(new_rule)
 
         session.flush()
         session.refresh(category)

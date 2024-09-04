@@ -38,10 +38,11 @@ TODO:
 * [DONE] Transaction categories
 * [DONE] Transaction rules
 * [DONE] Apply rules manually
-* Transaction pagination in FE
+* [DONE] Transaction pagination in FE
+* [DONE] Migrate rules to be account-specific (should categories be specific too? unsure)
+* [Punt] (it's just one extra call) Apply rules when importing transactions
 * Add hierarchy/ordering for categories when chosing transaction category
-* Migrate rules to be account-specific (should categories be specific too? unsure)
-* Apply rules when importing transactions
+Should add support for tracking balances in checking accounts
 * Mark transactions that have been validated manually and exclude them from recategorization when changing rules
 * Reporting by category and date (month, quarter, yty, etc)
 * Define budgets (an account is tied to one budget, allows users to define amount per category for target spending/saving) (is it important to track historic budgets? I don't think so??)
@@ -51,3 +52,5 @@ TODO:
 * Basic audit log?
 * User accounts & authentication? Can we enforce only in-home access with simple password and router forwarding?
 * Consider reimplementing in Electron w sqlite database to minimize footprint/make portable?
+
+
