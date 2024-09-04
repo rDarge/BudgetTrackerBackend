@@ -1,14 +1,18 @@
+from contextlib import contextmanager
 import os
 from typing import Annotated, List
+
+import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine, func, or_
 from sqlalchemy.orm import Session
-import uvicorn
 
 from backend.csv import parse_csv
 from backend.messages import (
     AccountData,
+    ApplyRulesRequest,
+    ApplyRulesResponse,
     CategoryData,
     GetCategoriesResponse,
     GetTransactionsResponse,
@@ -16,12 +20,14 @@ from backend.messages import (
     PostCategoryRequest,
     SupercategoryData,
     TransactionData,
+    TransactionUpdates,
     UpdateTransactionRequest,
     UpdateTransactionResponse,
 )
 from database.models import (
     Account,
     Category,
+    Rule,
     Supercategory,
     Transaction,
     TransactionFile,
@@ -49,15 +55,21 @@ default_engine = None
 
 
 def get_default_engine():
+    global default_engine
     if default_engine:
         return default_engine
     conn_string = os.environ.get("SQLALCHEMY_CONNECTION_STRING")
-    engine = create_engine(conn_string, future=True)
-    return Session(engine)
+    default_engine = create_engine(conn_string, future=True)
+    return default_engine
 
 
 async def session():
-    return get_default_engine()
+    session = Session(get_default_engine())
+    try:
+        yield session
+    finally:
+        print("closing session")
+        session.close()
 
 
 SessionDep = Annotated[Session, Depends(session)]
@@ -67,7 +79,7 @@ SessionDep = Annotated[Session, Depends(session)]
 async def post_account(session: SessionDep, request: PostAccountRequest):
     """Testing: curl -H "Content-Type: application/json" -d "{\"name\":\"test\"}" http://localhost:8000/account"""
     with session.begin():
-        new_account = Account(name=request.name)
+        new_account = Account(name=request.name, group=request.group)
         session.add(new_account)
         session.commit()
 
@@ -127,7 +139,7 @@ async def get_transactions(
         transactions = (
             session.query(Transaction)
             .filter(Transaction.account_id == account_id)
-            .order_by(Transaction.post_date.desc())
+            .order_by(Transaction.post_date.desc(), Transaction.description.asc())
             .offset(page * per_page)
             .limit(per_page)
             .all()
@@ -165,7 +177,7 @@ async def update_transaction(session: SessionDep, request: UpdateTransactionRequ
         ):
             raise HTTPException(
                 status_code=501,
-                detail="Cannot change transaction fields outside of category",
+                detail="Cannot change transaction fields outside of category and verified",
             )
 
         if request.newCategoryName:
@@ -186,8 +198,12 @@ async def update_transaction(session: SessionDep, request: UpdateTransactionRequ
                     detail="must supply superId or newSuperName when providing newCategoryName",
                 )
             transaction.category = category
-        else:
+        elif request.transaction.category_id != transaction.category_id:
             transaction.category_id = request.transaction.category_id
+
+        if request.transaction.verified_at:
+            transaction.verified_at = request.transaction.verified_at
+
         session.flush()
         result = TransactionData.model_validate(transaction, from_attributes=True)
 
@@ -239,6 +255,83 @@ async def post_category(session: SessionDep, request: PostCategoryRequest):
         session.commit()
 
     return AccountData.model_validate(new_category, from_attributes=True)
+
+
+@app.put("/category", response_model=CategoryData)
+async def update_category(session: SessionDep, request: CategoryData):
+    with session.begin():
+        category = session.get_one(Category, request.id)
+        category.name = request.name
+
+        if category.supercategory_id != request.supercategory_id:
+            category.supercategory_id = request.supercategory_id
+
+        for rule in category.rules:
+            session.delete(rule)
+
+        for rule in request.rules:
+            print(rule)
+            new_rule = Rule(
+                contains=rule.contains,
+                case_sensitive=rule.case_sensitive,
+                account_id=rule.account_id,
+                category=category,
+            )
+            print(new_rule)
+            session.add(new_rule)
+
+        session.flush()
+        session.refresh(category)
+        result = CategoryData.model_validate(category, from_attributes=True)
+        session.commit()
+
+    return result
+
+
+@app.post("/account/{account_id}/apply-rules", response_model=ApplyRulesResponse)
+async def apply_rules(account_id: int, request: ApplyRulesRequest, session: SessionDep):
+    updated_transactions: List[TransactionUpdates] = []
+    with session.begin():
+        rules = session.query(Rule).order_by(Rule.id.asc()).all()
+
+        # For each rule, for each transaction, update the category if the contains clause matches
+        for rule in rules:
+            if rule.category_id is None:
+                print(f"Invalid rule {rule.id} with contains ${rule.contains}")
+                continue
+            filter_clause = []
+            filter_clause.append(Transaction.account_id == account_id)
+            filter_clause.append(
+                or_(
+                    Transaction.category_id != rule.category_id,
+                    Transaction.category_id == None,
+                )
+            )
+            filter_clause.append(
+                Transaction.description.like(f"%{rule.contains}%")
+                if rule.case_sensitive
+                else Transaction.description.ilike(f"%{rule.contains}%")
+            )
+            records_to_update = session.query(Transaction).filter(*filter_clause).all()
+            for record in records_to_update:
+                updated_transactions.append(
+                    TransactionUpdates(
+                        transaction=TransactionData.model_validate(
+                            record, from_attributes=True
+                        ),
+                        old_category=(
+                            record.category.name if record.category else "None"
+                        ),
+                        new_category=rule.category.name,
+                    )
+                )
+
+                record.category_id = rule.category_id
+        if request.preview:
+            session.rollback()
+        else:
+            session.commit()
+    return ApplyRulesResponse(updated_transactions=updated_transactions)
 
 
 def start():
