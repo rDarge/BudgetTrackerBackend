@@ -1,8 +1,15 @@
 from datetime import datetime
 from typing import List
 
-from sqlalchemy import (Boolean, DateTime, Float, ForeignKey, LargeBinary,
-                        String, UniqueConstraint)
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    LargeBinary,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -27,8 +34,10 @@ class Account(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100))
+    group: Mapped[str] = mapped_column(String(100))
 
     transactions: Mapped[List["Transaction"]] = relationship(back_populates="account")
+    rules: Mapped[List["Rule"]] = relationship(back_populates="account")
 
 
 class Transaction(Base):
@@ -57,8 +66,22 @@ class Transaction(Base):
     source_file: Mapped[TransactionFile] = relationship(back_populates="transactions")
 
     __table_args__ = (
-        UniqueConstraint("post_date", "description", "amount", name="_transaction_uc"),
+        UniqueConstraint(
+            "post_date", "description", "amount", "account_id", name="_transaction_uc"
+        ),
     )
+
+    @property
+    def unique_string(self) -> str:
+        """Should roughly match the UniqueConstraint parameters listed above, used for resolving multiple near-duplicate transactions imported from csv"""
+        return "|".join(
+            [
+                str(self.post_date.timestamp()),
+                self.description,
+                str(self.amount),
+                str(self.account_id),
+            ]
+        )
 
 
 class Category(Base):
@@ -92,7 +115,12 @@ class Rule(Base):
     contains: Mapped[str] = mapped_column(String(100))
     case_sensitive: Mapped[bool] = mapped_column(Boolean)
 
-    category_id: Mapped[int | None] = mapped_column(
+    category_id: Mapped[int] = mapped_column(
         ForeignKey("category.id", name="rule_category_id")
     )
     category: Mapped["Category"] = relationship(back_populates="rules")
+
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("account.id", name="rule_account_id")
+    )
+    account: Mapped["Account"] = relationship(back_populates="rules")
